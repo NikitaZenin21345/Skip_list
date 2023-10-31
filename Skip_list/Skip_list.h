@@ -8,28 +8,40 @@
 constexpr size_t Max_Level = 10;
 
 template <typename Key,
-	typename Value>
+	typename Value, typename Alloc = std::allocator<std::pair<Key, Value>>>
 class node final
 {
-	using pointer_list = std::vector<node<Key, Value>*>;
+	using pointer_list = std::vector<node<Key, Value, Alloc>*>;
 	using pointer = node<Key, Value>*;
 	pointer_list pointer_list_right{};
-	pointer_list pointer_list_left{};
-	Key key{};
-	Value value{};
+	pointer_list pointer_list_left {};
+	std::pair<Key, Value>* node_value = nullptr;
 	size_t level{};
+	Alloc allocator{};
 public:
 	node() = default;
-	node(Key key_, Value val_, size_t level_) :key(key_), value(val_), level(level_)
+	node(const std::pair<Key, Value>& node_value_, const size_t level_, const Alloc& alloc = Alloc())
+		: level(level_), allocator(alloc)
 	{
+		node_value = allocator.allocate(sizeof(node_value_));
+		node_value->first = node_value_.first;
+		node_value->second = node_value_.second;
 		pointer_list_left.assign(level_, nullptr);
 		pointer_list_right.assign(level_, nullptr);
 	}
 
-	void set_value(const Value& value_) { value = value_; }
+	~node()//five rule
+	{
+		if(node_value!= nullptr)
+		{
+			allocator.deallocate(node_value, sizeof(*node_value));
+		}
+	}
+
+	void set_value(const Value& value_) { node_value->second = value_; }
 	decltype(auto) get_element()
 	{
-		return std::make_pair(key, value);
+		return *node_value;
 	}
 
 	void set_right_reference(const size_t index, node* value_) noexcept
@@ -37,15 +49,15 @@ public:
 		pointer_list_right[index] = value_;
 	}
 
-	node* next() { return pointer_list_right[0]; }
-
-	void set_left_reference(const size_t index, node* value_) noexcept {
+	void set_left_reference(const size_t index, node* value_) noexcept
+	{
 		pointer_list_left[index] = value_;
 	}
 
 	node* get_right_reference(const size_t index) noexcept { return pointer_list_right[index]; }
-
 	node* get_left_reference(const size_t index) noexcept { return pointer_list_left[index]; }
+	node* next() { return pointer_list_right[0]; }
+	node* prev() { return pointer_list_left[0]; }
 
 	static void bind_node(node* first, node* second, size_t level)
 	{
@@ -58,77 +70,93 @@ public:
 	}
 
 	[[nodiscard]] size_t get_level() const { return level; }
-
-	[[nodiscard]] Key& get_key() { return key; }
-	[[nodiscard]] const Key& get_key() const { return key; }
-	[[nodiscard]] Value& get_value() { return value; }
-	[[nodiscard]] const Value& get_value() const { return value; }
-
+	[[nodiscard]] Key& get_key() { return node_value->first; }
+	[[nodiscard]] const Key& get_key() const { return node_value->first; }
+	[[nodiscard]] Value& get_value() { return node_value->second; }
+	[[nodiscard]] const Value& get_value() const { return node_value->second; }
 };
 
 template <typename Key, typename Value>
-class const_node_iterator
+class abstract_node_iterator
 {
 protected:
 	node<Key, Value>* list_begin;
 	node<Key, Value>* list_end;
 	node<Key, Value>* node_pointer;
 
-public:
-	using value_type = Value;
-	using reference = node<Key, Value>&;
-	using pointer = node<Key, Value>*;
-	using difference_type = typename std::pointer_traits<node<Key, Value>*>::difference_type;
-	using iterator_category = std::bidirectional_iterator_tag;
-	const_node_iterator(const pointer& begin_, const pointer& end_, const pointer& node_ptr) :list_begin(begin_), list_end(end_), node_pointer(node_ptr) {}
-	reference operator*() const
+	void dereferencing_end_check()
 	{
 		if (node_pointer == list_end)
 		{
 			throw error_dereferencing_end();
 		}
-		return *node_pointer;
 	}
 
-	const_node_iterator& operator++()
+	void out_of_range_check(node<Key, Value>* boundary)
 	{
-		if (node_pointer == list_end)
+		if (this->node_pointer == boundary)
 		{
 			throw std::out_of_range("out of range");
 		}
-		node_pointer = node_pointer->next();
-		return *this;
 	}
 
-	/*const_node_iterator& operator++(int)
-	{
-		if (node_pointer == list_end)
-		{
-			throw std::out_of_range("out of range");
-		}
-		node_pointer = node_pointer->get_right_reference(0);
-		auto next_node = node_pointer;
-		return next_node;
-	}*/
+public:
+	using reference = std::pair<Key,Value>&;
+	using pointer = std::pair<Key, Value>*;
 
-	const_node_iterator& operator--()
+	abstract_node_iterator(node<Key, Value>* begin_, node<Key, Value>* end_, node<Key, Value>* node_ptr)
+		:list_begin(begin_), list_end(end_), node_pointer(node_ptr) {}
+
+	reference operator*() const
 	{
-		if (node_pointer == list_begin)
-		{
-			throw std::out_of_range("out of range");
-		}
-		node_pointer = node_pointer->get_left_reference(0);
-		return *this;
+		dereferencing_end_check();
+		return node_pointer->get_element();
 	}
 
-	bool operator==(const const_node_iterator& other) const noexcept
+	bool operator==(const abstract_node_iterator& other) const noexcept
 	{
 		return node_pointer == other.node_pointer;
 	}
 
-	bool operator!=(const const_node_iterator& other) const noexcept 
+	bool operator!=(const abstract_node_iterator& other) const noexcept
 	{
 		return node_pointer != other.node_pointer;
+	}
+};
+
+template <typename Key, typename Value>
+class const_node_iterator : public abstract_node_iterator<Key, Value>
+{
+public:
+	using value_type = std::pair<Key, Value>;
+	using reference = value_type&;
+	using pointer =  value_type*;
+	using difference_type = typename std::pointer_traits<node<Key, Value>*>::difference_type;
+	using iterator_category = std::bidirectional_iterator_tag;
+
+	const_node_iterator(node<Key, Value>* begin_, node<Key, Value>* end_, node<Key, Value>* node_ptr)//naming
+		:abstract_node_iterator<Key, Value>(begin_, end_, node_ptr) {}
+
+	const_node_iterator& operator++()
+	{
+		abstract_node_iterator<Key, Value>::out_of_range_check(this->list_end);
+		this->node_pointer = this->node_pointer->next();
+		return *this;
+	}
+
+	const_node_iterator& operator++(int)
+	{
+		abstract_node_iterator<Key, Value>::out_of_range_check(this->list_end);
+		this->node_pointer = this->node_pointer->get_right_reference(0);
+		auto next_node = this->node_pointer;
+		return next_node;
+	}
+
+	const_node_iterator& operator--()
+	{
+		abstract_node_iterator<Key, Value>::out_of_range_check(this->list_begin);
+		this->node_pointer = this->node_pointer->get_left_reference(0);
+		return *this;
 	}
 };
 
@@ -136,53 +164,44 @@ template <typename Key, typename Value>
 class node_iterator final : public const_node_iterator<Key, Value>
 {
 public:
-	using value_type = node<Key, Value>;
-	using reference = node<Key, Value>&;
-	using pointer = node<Key, Value>*;
+	using value_type = std::pair<Key, Value >;
+	using reference = value_type&;
+	using pointer = value_type*;
 	using difference_type = typename std::pointer_traits<node<Key, Value>*>::difference_type;
 	using iterator_category = std::bidirectional_iterator_tag;
 
-	node_iterator(const pointer& begin_, const pointer& end_, const pointer& node_ptr)//naming
+	node_iterator(node<Key, Value>* begin_, node<Key, Value>* end_, node<Key, Value>* node_ptr)//naming
 		:const_node_iterator<Key, Value>(begin_, end_, node_ptr) {}
 	reference operator*()
 	{
-		if (this->node_pointer == this->list_end)
-		{
-			throw error_dereferencing_end();
-		}
-		return *(this->node_pointer);
+		abstract_node_iterator<Key, Value>::dereferencing_end_check();
+		return this->node_pointer->get_element();
 	}
 };
 
 template <typename Key, typename Value>
-class reverse_const_node_iterator : public const_node_iterator<Key, Value>
+class reverse_const_node_iterator : public abstract_node_iterator<Key, Value>
 {
 public:
-	using value_type = node<Key, Value>;
-	using reference = node<Key, Value>&;
-	using pointer = node<Key, Value>*;
+	using value_type = std::pair<Key, Value>;
+	using reference = std::pair<Key, Value>&;
+	using pointer = std::pair<Key, Value>*;
 	using difference_type = typename std::pointer_traits<node<Key, Value>*>::difference_type;
 	using iterator_category = std::bidirectional_iterator_tag;
 
-	reverse_const_node_iterator(const pointer& begin_, const pointer& end_, const pointer& node_ptr)//naming
-		:const_node_iterator<Key, Value>(begin_, end_, node_ptr) {}
+	reverse_const_node_iterator(node<Key,Value>* begin_, node<Key, Value>* end_, node<Key, Value>* node_ptr)//naming
+		:abstract_node_iterator<Key, Value>(begin_, end_, node_ptr) {}
 
-	reverse_const_node_iterator& operator++() 
+	reverse_const_node_iterator& operator++()
 	{
-		if (this->node_pointer == this->list_end)
-		{
-			throw std::out_of_range("out of range");
-		}
+		abstract_node_iterator<Key, Value>::out_of_range_check(this->list_begin);
 		this->node_pointer = this->node_pointer->get_left_reference(0);
 		return *this;
 	}
 
 	reverse_const_node_iterator& operator--()
 	{
-		if (this->node_pointer == this->list_end)
-		{
-			throw std::out_of_range("out of range");
-		}
+		abstract_node_iterator<Key, Value>::out_of_range_check(this->list_end);
 		this->node_pointer = this->node_pointer->next();
 		return *this;
 	}
@@ -193,21 +212,18 @@ class reverse_node_iterator : public reverse_const_node_iterator<Key, Value>
 {
 public:
 	using value_type = node<Key, Value>;
-	using reference = node<Key, Value>&;
-	using pointer = node<Key, Value>*;
+	using reference = std::pair<Key, Value>&;
+	using pointer = std::pair<Key, Value>*;
 	using difference_type = typename std::pointer_traits<node<Key, Value>*>::difference_type;
 	using iterator_category = std::bidirectional_iterator_tag;
 
-	reverse_node_iterator(const pointer& begin_, const pointer& end_, const pointer& node_ptr)//naming
+	reverse_node_iterator(node<Key, Value>* begin_, node<Key, Value>* end_, node<Key, Value>* node_ptr)//naming
 		:reverse_const_node_iterator<Key, Value>(begin_, end_, node_ptr) {}
 
 	reference operator*()
 	{
-		if (this->node_pointer == this->list_end)
-		{
-			throw error_dereferencing_end();
-		}
-		return *(this->node_pointer);
+		abstract_node_iterator<Key, Value>::dereferencing_end_check();
+		return this->node_pointer->get_element();
 	}
 };
 
@@ -263,7 +279,7 @@ class skip_list final {
 	void delete_node(node<Key, Value>* del_node)
 	{
 		auto lvl = del_node->get_level();
-		for (int lvl_index = 0; lvl_index < lvl; ++lvl_index)
+		for (size_t lvl_index = 0; lvl_index < lvl; ++lvl_index)
 		{
 			auto next_element = del_node->get_right_reference(lvl_index);
 			auto prev_element = del_node->get_left_reference(lvl_index);
@@ -376,32 +392,17 @@ public:
 		return *this;
 	}
 
-	iterator begin()
-	{
-		return node_iterator<Key, Value>(head, tail, head->get_right_reference(0));
-	}
+	iterator begin() { return node_iterator<Key, Value>(head, tail, head->next());}
 
-	[[nodiscard]] const_iterator begin() const
-	{
-		return const_node_iterator<Key, Value>(head, tail, head->get_right_reference(0));
-	}
+	iterator end() { return node_iterator<Key, Value>(head, tail, tail);}
 
-	iterator end()
-	{
-		return node_iterator<Key, Value>(head, tail, tail);
-	}
+	[[nodiscard]] const_iterator begin() const { return const_node_iterator<Key, Value>(head, tail, head->next());}
 
-	[[nodiscard]] const_iterator end() const
-	{
-		return const_node_iterator<Key, Value>(head, tail, tail);
-	}
+	[[nodiscard]] const_iterator end() const { return const_node_iterator<Key, Value>(head, tail, tail);}
 
-	[[nodiscard]] bool empty() const
-	{
-		return list_size == 0;
-	}
+	[[nodiscard]] bool empty() const { return list_size == 0;}
 
-	[[nodiscard]] size_t size() const { return list_size; }
+	[[nodiscard]] size_t size() const { return list_size;}
 
 	Value& operator[](const Key& key)
 	{
@@ -419,6 +420,10 @@ public:
 	Value& at(const Key& key)
 	{
 		auto searched_key = search_key(key);
+		if (searched_key == tail)
+		{
+			throw std::out_of_range("Out of range!");
+		}
 		auto& value = searched_key->get_value();
 		return value;
 	}
@@ -439,14 +444,12 @@ public:
 		{
 			auto updated_nods = search_key_storing_past_elements(key, level);
 			auto element = updated_nods[0]->next();
-			if (element->get_key() == key)
+			if (element->get_key() == key) /*!compare(element->get_key(), key) && !compare(key, element->get_key())*/
 			{
 				element->set_value(value);
-				return std::pair<iterator, bool>(node_iterator<Key, Value>(head, tail, element), false);
+				return std::pair<iterator, bool>(iterator(head, tail, element), false);
 			}
-
-			new_node = new node<Key, Value>(key, value, level);
-			const size_t update_nods_size = updated_nods.size() - 1;
+			new_node = new node<Key, Value>(value_nods, level);
 			for (size_t index = 0; index < level; ++index)
 			{
 				auto updated_node = updated_nods[index];
@@ -458,7 +461,7 @@ public:
 		}
 		else
 		{
-			new_node = new node<Key, Value>(key, value, level);
+			new_node = new node<Key, Value>(value_nods, level);
 			for (size_t index = 0; index < level; ++index)
 			{
 				head->set_right_reference(index, new_node);
@@ -472,7 +475,7 @@ public:
 			list_lvl = level;
 		}
 		list_size++;
-		return std::pair<iterator, bool>(node_iterator<Key, Value>(head, tail, new_node), true);
+		return std::pair<iterator, bool>(iterator(head, tail, new_node), true);
 	}
 
 	void erase(iterator position)
@@ -537,11 +540,11 @@ public:
 	iterator find(const Key& key)
 	{
 		auto searched_node = search_key(key);
-		if(searched_node == tail)
+		if (searched_node == tail)
 		{
 			return iterator(tail, tail, tail);
 		}
-		if(searched_node->get_key() == key)
+		if (searched_node->get_key() == key)
 		{
 			return iterator(head, tail, searched_node);
 		}
@@ -560,15 +563,21 @@ public:
 		}
 		return const_iterator(tail, tail, tail);
 	}
-	
 
-	reverse_iterator rbegin();
-	reverse_iterator rend();
-	const_reverse_iterator rbegin() const;
-	const_reverse_iterator rend() const;
+	reverse_iterator rbegin() { return reverse_iterator(head, tail, tail->prev());}
+	reverse_iterator rend() { return reverse_iterator(head, tail, head);}
+	[[nodiscard]] const_reverse_iterator rbegin() const { return const_reverse_iterator(head, tail, tail->prev());}
+	[[nodiscard]] const_reverse_iterator rend() const { return const_reverse_iterator(head, tail, head); }
 
-	size_t count(const Key& key) const;
-
+	[[nodiscard]] size_type count(const Key& key) const
+	{
+		auto searched_node = search_key(key);
+		if (searched_node == tail)
+		{
+			return 0;
+		}
+		return 1;
+	}
 };
 
 //template <typename K, typename V, typename C, typename A>
