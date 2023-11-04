@@ -4,7 +4,7 @@
 #include <crtdbg.h> 
 #include "test_class.h"
 
-class SkipListTestMem : public ::testing::Test {
+class SkipListTest : public ::testing::Test {
 protected:
 	virtual void SetUp(void) {
 		_CrtMemCheckpoint(&startup);
@@ -17,44 +17,168 @@ protected:
 	_CrtMemState startup;
 };
 
-TEST_F(SkipListTestMem, InsertElements) {
-	auto list = skip_list<int, int, std::greater<>>(std::greater<>());
-	for (int i = 0; i < 200; ++i)
-	{
-		list.insert(std::pair<int, int>(i, 100 + i));
-	}
-	int index = 0;
-	for (const auto& a : list)
-	{
-		std::cout << a.second << std::endl;
-	}
+TEST_F(SkipListTest, InsertElements) {
+	auto list = skip_list_space::skip_list<int, int>();
+	list.insert(std::pair<int, int>(0, 100));
+	
 }
 
-TEST_F(SkipListTestMem, EraseOnceListElement) {
-	auto list = skip_list<user_class<int>, int>();
+TEST_F(SkipListTest, EraseOnceListElement) {
+	auto list = skip_list_space::skip_list<user_class<int>, int>();
 	list.insert(std::pair<user_class<int>, int>({ 0 }, 100));
 	list.erase(0);
-	std::cout << list.size() << std::endl;
 }
 
-TEST(SkipListTest, Loop) {
-	auto list = skip_list<int, int>();
-	list.insert(std::pair<int, int>(0, 100));
-	list.erase(0);
-	std::cout << list.size() << std::endl;
-}
-
-TEST(SkipListTest, ReverseLoop) {
-	auto list = skip_list<double, int>();
+TEST_F(SkipListTest, FindElement) {
+	using list_type = skip_list_space::skip_list<user_class<double>, int>;
+	auto list = list_type();
 	size_t size = 10;
-	auto rand_vec = get_random_vector(size);
+	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
+	for (size_t index = 0; index < size; ++index)
+	{
+		list.insert(std::pair<double, int>(rand_vec[index], index));
+	}
+	auto finded_element = list.find(user_class(rand_vec[4]));
+	EXPECT_TRUE((*finded_element).second == 4);
+	auto const_finded_element = list.find(user_class(rand_vec[7]));
+}
+
+TEST_F(SkipListTest, Loop) {
+	auto list = skip_list_space::skip_list<int, int, std::greater<>>(std::greater<>());
+	size_t size = 200;
+	for (int i = 1; i <= size; ++i)
+	{
+		list.insert(std::pair<int, int>(i, size - i));
+	}
+	int index = 0;
+	for (const auto& val : list)
+	{
+		EXPECT_TRUE(val.second ==  index);
+		++index;
+	}
+}
+
+TEST_F(SkipListTest, ReverseLoop)
+{
+	auto list = skip_list_space::skip_list<double, int>();
+	const size_t size = 10;
+	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
 	for (size_t index = 0; index < size; ++index)
 	{
 		list.insert(std::pair<double, int>(rand_vec[index], index ));
 	}
-	//std::sort(rand_vec.begin(), rand_vec.end());
-	for(auto [key, value] : list)
+	std::sort(rand_vec.begin(), rand_vec.end());
+	int index = size - 1;
+	/*for(auto iter = list.rbegin(); iter != list.rend(); ++iter)
 	{
-		EXPECT_DOUBLE_EQ(key , rand_vec[value]);
+		EXPECT_DOUBLE_EQ( iter.operator*().first, rand_vec[index]);
+		--index;
+	}*/
+}
+
+TEST_F(SkipListTest, Iter)
+{
+	using list_type = skip_list_space::skip_list<int, int>;
+	auto list = list_type();
+	size_t size = 200;
+	for (int i = 0; i < size; ++i)
+	{
+		list.insert(std::pair<int, int>(i, i));
+	}
+	/*list_type::iterator iter = list.begin();
+	list_type::iterator next = ++iter;
+	list_type::iterator prev_next = --next;*/
+
+	auto iter = list.begin();
+	auto prev_next = --(++iter);
+	EXPECT_TRUE(iter == prev_next);
+
+	for (auto& [key, value] : list)
+	{
+		value = 0;
+	}
+	
+}
+
+TEST_F(SkipListTest, Erase) {
+	auto list = skip_list_space::skip_list<double, int, std::greater<>>(std::greater<>());
+	const size_t size = 100;
+	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
+	for (size_t index = 0; index < size; ++index)
+	{
+		list.insert(std::pair<double, int>(rand_vec[index], index));
+	}
+
+	auto iter = ++list.begin();
+	auto erased_elem = *iter;
+	EXPECT_TRUE(list.find(erased_elem.first) == iter);
+	list.erase(iter);
+	EXPECT_TRUE(list.find(erased_elem.first) == list.end());
+	EXPECT_FALSE(iter == ++list.begin());
+	EXPECT_TRUE(list.size() == size - 1);
+}
+
+TEST_F(SkipListTest, EraseRange) {
+	auto list = skip_list_space::skip_list<double, int, std::greater<>>(std::greater<>());
+	const size_t size = 100;
+	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
+	for (size_t index = 0; index < size; ++index)
+	{
+		list.insert(std::pair<double, int>(rand_vec[index], index));
+	}
+	std::sort(rand_vec.begin(), rand_vec.end(), std::greater());
+
+	auto iter = list.begin();
+	for (size_t index = 0; index < size / 2; ++index)
+	{
+		++iter;
+	}
+	list.erase(list.begin(), iter);
+	EXPECT_TRUE(list.size() == size / 2 - 1);
+	for (size_t index = 0; index < size / 2; ++index)
+	{
+		EXPECT_TRUE(list.find(rand_vec[index]) == list.end());
 	}
 }
+
+TEST_F(SkipListTest, EraseKey) {
+	auto list = skip_list_space::skip_list<double, user_class<int>, std::greater<>>(std::greater<>());
+	const size_t size = 100;
+	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
+	for (size_t index = 0; index < size; ++index)
+	{
+		list.insert(std::pair(rand_vec[index], user_class<int>(index)));
+	}
+	std::sort(rand_vec.begin(), rand_vec.end(), std::greater());
+
+	list.erase(rand_vec[size / 2]);
+	EXPECT_TRUE(list.size() == size - 1);
+	EXPECT_TRUE(list.find(rand_vec[size / 2]) == list.end());
+	list.erase(rand_vec[0]);
+	EXPECT_TRUE(list.size() == size - 2);
+	EXPECT_TRUE(list.find(rand_vec[0]) == list.end());
+}
+
+TEST_F(SkipListTest, Swap) {
+	auto list = skip_list_space::skip_list<double, user_class<int>, std::greater<>>(std::greater<>());
+	auto other_list = skip_list_space::skip_list<double, user_class<int>, std::greater<>>(std::greater<>());
+	const size_t size = 100;
+	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
+	for (size_t index = 0; index < size; ++index)
+	{
+		list.insert(std::pair(rand_vec[index], user_class<int>(index)));
+		other_list.insert(std::pair(rand_vec[index], user_class<int>(size - index)));
+	}
+	list.swap(other_list);
+}
+
+//TEST_F(SkipListTest, OperatorEqual) {
+//	auto list = skip_list_space::skip_list<double, user_class<int>, std::greater<>>(std::greater<>());
+//	const size_t size = 100;
+//	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
+//	for (size_t index = 0; index < size; ++index)
+//	{
+//		list.insert(std::pair(rand_vec[index], user_class<int>(index)));
+//	}
+//	auto other_list = list;
+//}

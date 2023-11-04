@@ -20,13 +20,13 @@ public:
 		return value;
 	}
 };
-
-inline std::vector<double> get_random_vector(size_t size) 
+template<typename type>
+std::vector<type> get_random_vector(size_t size,const type low_bound,const type up_bound)
 {
-	std::vector<double> vec;
+	std::vector<type> vec;
 	for(size_t index = 0 ;index!=size; index++)
 	{
-		vec.push_back(impl::get_random_number(0.0, 10.0));
+		vec.push_back(impl::get_random_number<type>(low_bound, up_bound));
 	}
 	return vec;
 }

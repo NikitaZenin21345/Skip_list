@@ -34,6 +34,7 @@
   <PropertyGroup Label="UserMacros" />
   <ItemGroup>
     <ClInclude Include="pch.h" />
+    <ClInclude Include="skip_list_condition.h" />
     <ClInclude Include="test_class.h" />
   </ItemGroup>
   <ItemGroup>
