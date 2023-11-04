@@ -42,23 +42,23 @@ namespace skip_list_space
 			pointer_list_right = other.pointer_list_right;
 			pointer_list_left = other.pointer_list_left;
 			level = other.level;
-			node_value = allocator.allocate(sizeof(*other.node_value));
-			node_value->first = other.node_value->first;
-			node_value->second = other.node_value->second;
+			node_value = std::allocator_traits<Alloc>::allocate(allocator, 1);
+			std::allocator_traits<Alloc>::construct(allocator, node_value, other.node_value->first, other.node_value->first);
 		}
 
-		node(const node&& other) noexcept//other node not have reference on this node 
+		node(const node&& other) noexcept
 		{
 			allocator = std::move(other.allocator);
 			pointer_list_right = std::move(other.pointer_list_right);
 			pointer_list_left = std::move(other.pointer_list_left);
 			level = std::move(other.level);
 			node_value = other.node_value;
+			other.node_value = nullptr;
 		}
 
-		node& operator=(const node& other) 
+		node& operator=(const node& other)
 		{
-			if(this == &other)
+			if (this == &other)
 			{
 				return *this;
 			}
@@ -76,7 +76,7 @@ namespace skip_list_space
 			return *this;
 		}
 
-		node& operator=(const node&& other)
+		node& operator=(const node&& other) noexcept
 		{
 			if (this == &other)
 			{
@@ -95,8 +95,13 @@ namespace skip_list_space
 			}
 		}
 
-		void set_value(const Value& value_) { node_value->second = value_;}
-		decltype(auto) get_element()	{ return *node_value;}
+		/*bool operator==(const node& other) const
+		{
+			return node_value == other.node_value;
+		}*/
+
+		void set_value(const Value& value_) { node_value->second = value_; }
+		decltype(auto) get_element() { return *node_value; }
 
 		void set_right_reference(const size_t index, node* value_) noexcept
 		{
@@ -124,7 +129,7 @@ namespace skip_list_space
 		}
 
 		[[nodiscard]] size_t get_level() const { return level; }
-		[[nodiscard]]const Key& get_key() { return node_value->first; }
+		[[nodiscard]] const Key& get_key() { return node_value->first; }
 		[[nodiscard]] const Key& get_key() const { return node_value->first; }
 		[[nodiscard]] Value& get_value() { return node_value->second; }
 		[[nodiscard]] const Value& get_value() const { return node_value->second; }
@@ -133,7 +138,7 @@ namespace skip_list_space
 	template <bool IsConst, typename Key, typename Value, typename Alloc >
 	class node_iterator final
 	{
-		node<Key, Value,Alloc>* list_begin;
+		node<Key, Value, Alloc>* list_begin;
 		node<Key, Value, Alloc>* list_end;
 		node<Key, Value, Alloc>* node_pointer;
 
@@ -151,7 +156,7 @@ namespace skip_list_space
 		using pointer = std::pair<const Key, Value>*;
 		using difference_type = std::ptrdiff_t;
 		using iterator_category = std::bidirectional_iterator_tag;
-		using condition_ref = std::conditional_t<IsConst, const std::remove_cv_t<reference>, reference>;
+		using condition_ref = std::conditional_t<IsConst, std::add_const_t<std::remove_reference_t<reference>>&, reference>;
 		node_iterator(node<Key, Value, Alloc>* begin_, node<Key, Value, Alloc>* end_, node<Key, Value, Alloc>* node_ptr)
 			:list_begin(begin_), list_end(end_), node_pointer(node_ptr) {}
 
@@ -181,14 +186,14 @@ namespace skip_list_space
 
 		decltype(auto) operator++()
 		{
-			out_of_range_check(this->list_end);
-			this->node_pointer = this->node_pointer->next();
+			out_of_range_check(list_end);
+			node_pointer = node_pointer->next();
 			return *this;
 		}
 
 		decltype(auto) operator++(int)
 		{
-			out_of_range_check(this->list_end);
+			out_of_range_check(list_end);
 			auto node = *this;
 			++(*this);
 			return node;
@@ -196,8 +201,8 @@ namespace skip_list_space
 
 		decltype(auto) operator--()
 		{
-			out_of_range_check(this->list_begin);
-			this->node_pointer = this->node_pointer->prev();
+			out_of_range_check(list_begin);
+			node_pointer = node_pointer->prev();
 			return *this;
 		}
 	};
@@ -214,7 +219,7 @@ namespace skip_list_space
 		Compare compare;
 		Alloc allocator;
 		size_t list_size{};
-		size_t list_lvl;
+		size_t list_lvl{};
 
 		decltype(auto) search_key_storing_past_elements(Key key, const size_t level)
 		{
@@ -233,8 +238,9 @@ namespace skip_list_space
 			return past_elements;
 		}
 
-		node<Key, Value>* search_key(Key key)
+		[[nodiscard]]node<Key, Value, Alloc>* search_key(Key key) const
 		{
+			
 			auto node = head;
 			for (int lvl_index = static_cast<int>(list_lvl) - 1; lvl_index >= 0; --lvl_index)
 			{
@@ -244,9 +250,12 @@ namespace skip_list_space
 					node = node->get_right_reference(lvl_index);
 				}
 			}
-			if (node->next()->get_key() == key)
+			if (list_size != 0)
 			{
-				return node->next();
+				if (!compare(node->next()->get_key(), key) && !compare(key, node->next()->get_key()))
+				{
+					return node->next();
+				}
 			}
 			return tail;
 		}
@@ -308,16 +317,17 @@ namespace skip_list_space
 			delete_list();
 		}
 
-		skip_list(const skip_list& another) noexcept : compare(another.compare), allocator(another.allocator),
-			list_size(another.list_size), list_lvl(another.list_lvl)
+		skip_list(const skip_list& another) noexcept : compare(another.compare), allocator(another.allocator)
 		{
-			//delete_list();
+
+			list_size = 0;
+			list_lvl = 0;
 			head = new node<Key, Value, Alloc>;
 			tail = new node<Key, Value, Alloc>;
 			node<Key, Value>::bind_node(head, tail, Max_Level);
-			for (const auto& node : another)
+			for (const_iterator node = another.cbegin(); node != another.cend(); ++node)
 			{
-				this->insert(std::make_pair(node.first, node.second));
+				this->insert(std::make_pair((*node).first, (*node).second));
 			}
 		}
 
@@ -328,8 +338,8 @@ namespace skip_list_space
 			tail = another.tail;
 			another.list_lvl = 0;
 			another.list_size = 0;
-			std::swap(head, another.head);
-			std::swap(tail, another.tail);
+			another.head = nullptr;
+			another.tail = nullptr;
 		}
 
 		skip_list& operator=(const skip_list& another)//!!
@@ -382,20 +392,21 @@ namespace skip_list_space
 		[[nodiscard]] size_t size() const { return list_size; }
 
 		Value& operator[](const Key& key)
+		requires std::is_default_constructible_v<Value>
 		{
 			auto searched_key = search_key(key);
 			if (searched_key == tail)
 			{
 				Value new_value{};
 				auto new_node = insert(std::make_pair(key, new_value));
-				return (*new_node.first).get_value();
+				return (*(new_node.first)).second;
 			}
-			return searched_key.get_value();
+			return searched_key->get_value();
 		}
 
-		Value& at(const Key& key)
+		[[nodiscard]] const Value& at(const Key& key) const
 		{
-			auto searched_key = search_key(key);
+			node<Key, Value, Alloc>* searched_key = search_key(key);
 			if (searched_key == tail)
 			{
 				throw std::out_of_range("Out of range!");
@@ -404,19 +415,18 @@ namespace skip_list_space
 			return value;
 		}
 
-		[[nodiscard]] const Value& at(const Key& key) const
+		Value& at(const Key& key)
 		{
-			auto searched_key = search_key(key);
-			const Value& value = searched_key->get_value();
-			return value;
+			return const_cast<Value&>(const_cast<const skip_list*>(this)->at(key));
 		}
+
 		template<class Pair>
 			requires std::is_convertible_v<Pair, const std::pair<const Key, Value>>
 		std::pair<iterator, bool> insert(Pair&& value_nods)
 		{
 			auto [key, value] = value_nods;
 			size_t level = random_level(Max_Level);
-			node<Key, Value>* new_node = nullptr;
+			node<Key, Value, Alloc>* new_node = nullptr;
 			if (list_size)
 			{
 				auto updated_nods = search_key_storing_past_elements(key, level);
@@ -499,19 +509,9 @@ namespace skip_list_space
 
 		void clear()
 		{
-			auto del_node = head->next();
-			if (del_node == tail)
-			{
-				return;
-			}
-			auto next_node = del_node->next();
-			while (del_node != tail)
-			{
-				delete del_node;
-				del_node = next_node;
-				next_node = next_node->next();
-			}
-			list_size = 0;
+			delete_list();
+			head = new node<Key, Value, Alloc>;
+			tail = new node<Key, Value, Alloc>;
 			list_lvl = 0;
 			node<Key, Value>::bind_node(head, tail, Max_Level);
 		}
@@ -544,10 +544,10 @@ namespace skip_list_space
 			return const_iterator(head, tail, tail);
 		}
 
-		reverse_iterator rbegin() { return reverse_iterator(iterator(head, tail, tail->prev())); }
-		reverse_iterator rend() { return reverse_iterator(iterator(head, tail, head)); }
-		[[nodiscard]] const_reverse_iterator rbegin() const { return const_reverse_iterator(head, tail, tail->prev()); }
-		[[nodiscard]] const_reverse_iterator rend() const { return const_reverse_iterator(head, tail, head); }
+		reverse_iterator rbegin() { return reverse_iterator(iterator(head, tail, tail)); }
+		reverse_iterator rend() { return reverse_iterator(iterator(head, tail, head->next())); }
+		[[nodiscard]] const_reverse_iterator rbegin() const { return const_reverse_iterator(const_iterator(head, tail, tail)); }
+		[[nodiscard]] const_reverse_iterator rend() const { return const_reverse_iterator(const_iterator(head, tail, head->next())); }
 
 		[[nodiscard]] size_type count(const Key& key) const
 		{
@@ -558,16 +558,34 @@ namespace skip_list_space
 			}
 			return 1;
 		}
+
+		bool operator==(const skip_list& another) const
+		{
+			if (another.size() != list_size)
+			{
+				return false;
+			}
+			auto another_node = another.cbegin();
+			auto node = cbegin();
+			for (size_t index = 0; index != list_size; ++index)
+			{
+				if (compare((*node).first, (*another_node).first) || compare((*another_node).first, (*node).first))
+				{
+					return false;
+				}
+				if ((*node).second != (*another_node).second)
+				{
+					return false;
+				}
+				++node;
+				++another_node;
+			}
+			return true;
+		}
+
+		bool operator!=(const skip_list& another) const
+		{
+			return !(another == *this);
+		}
 	};
 }
-
-
-//template <typename K, typename V, typename C, typename A>
-//inline bool operator==(const skip_list<K, V, C, A>& x, const skip_list<K, V, C, A>& y) {
-//	// ....
-//}
-//
-//template <typename K, typename V, typename C, typename A>
-//inline bool operator!=(const skip_list<K, V, C, A>& x, const skip_list<K, V, C, A>& y) {
-//	// ....
-//}
