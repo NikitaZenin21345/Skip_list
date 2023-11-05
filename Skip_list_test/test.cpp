@@ -17,16 +17,36 @@ protected:
 	_CrtMemState startup;
 };
 
+TEST_F(SkipListTest, EmptyList) {
+	auto list = skip_list_space::skip_list<int, int>();
+	auto found_element = list.find(0);
+	EXPECT_TRUE(found_element == list.end());
+	EXPECT_TRUE(list.erase(0) == 0);
+	list.erase(list.begin(), list.end());
+	EXPECT_TRUE(list.size() == 0);
+	list.clear();
+	EXPECT_TRUE(list.size() == 0);
+}
+
 TEST_F(SkipListTest, InsertElements) {
 	auto list = skip_list_space::skip_list<int, int>();
 	list.insert(std::pair<int, int>(0, 100));
-	
+	auto found_element = list.find(0);
+	EXPECT_TRUE((*found_element).second == 100);
+	EXPECT_TRUE(list.size() == 1);
+	list.erase(0);
+	EXPECT_TRUE(list.size() == 0);
+	list[1] = 101;
+	list.erase(list.begin(), list.end());
+	EXPECT_TRUE(list.size() == 0);
 }
 
 TEST_F(SkipListTest, EraseOnceListElement) {
 	auto list = skip_list_space::skip_list<user_class<int>, int>();
 	list.insert(std::pair<user_class<int>, int>({ 0 }, 100));
 	list.erase(0);
+	auto found_element = list.find(0);
+	EXPECT_TRUE(found_element == list.end());
 }
 
 TEST_F(SkipListTest, FindElement) {
@@ -38,9 +58,9 @@ TEST_F(SkipListTest, FindElement) {
 	{
 		list.insert(std::pair<double, int>(rand_vec[index], index));
 	}
-	auto finded_element = list.find(user_class(rand_vec[4]));
-	EXPECT_TRUE((*finded_element).second == 4);
-	auto const_finded_element = list.find(user_class(rand_vec[7]));
+	auto found_element = list.find(user_class(rand_vec[4]));
+	EXPECT_TRUE((*found_element).second == 4);
+	auto const_found_element = list.find(user_class(rand_vec[7]));
 }
 
 TEST_F(SkipListTest, Loop) {
@@ -137,7 +157,7 @@ TEST_F(SkipListTest, EraseRange) {
 	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
 	for (size_t index = 0; index < size; ++index)
 	{
-		list.insert(std::pair<double, int>(rand_vec[index], index));
+		list.insert(std::pair<const double, int>(rand_vec[index], index));
 	}
 	std::sort(rand_vec.begin(), rand_vec.end(), std::greater());
 
@@ -147,7 +167,7 @@ TEST_F(SkipListTest, EraseRange) {
 		++iter;
 	}
 	list.erase(list.begin(), iter);
-	EXPECT_TRUE(list.size() == size / 2 - 1);
+	EXPECT_TRUE(list.size() == size / 2);
 	for (size_t index = 0; index < size / 2; ++index)
 	{
 		EXPECT_TRUE(list.find(rand_vec[index]) == list.end());
@@ -183,6 +203,11 @@ TEST_F(SkipListTest, Swap) {
 		other_list.insert(std::pair(rand_vec[index], user_class<size_t>(size - index)));
 	}
 	list.swap(other_list);
+	for (size_t index = 0; index < size; ++index)
+	{
+		EXPECT_TRUE(list .at(rand_vec[index]) == user_class(size - index));
+		EXPECT_TRUE(other_list.at(rand_vec[index]) == user_class(index));
+	}
 }
 
 TEST_F(SkipListTest, OperatorEqual) {
@@ -232,6 +257,7 @@ TEST_F(SkipListTest, At) {
 	list.at(key) = new_value;
 	EXPECT_DOUBLE_EQ((*list.find(key)).second, new_value);
 	static_assert(std::is_same_v<decltype(const_list.at(key)),const double&>);
+	EXPECT_THROW(list.at(size), std::out_of_range);
 }
 
 TEST_F(SkipListTest, Clear) {
@@ -248,4 +274,57 @@ TEST_F(SkipListTest, Clear) {
 	{
 		EXPECT_TRUE(list.find(rand_vec[index]) == list.end());
 	}
+}
+
+TEST_F(SkipListTest, ContainString) {
+	auto list = skip_list_space::skip_list<size_t, std::string>();
+	auto other_list = skip_list_space::skip_list<size_t, std::string>();
+	const size_t size = 100;
+	for (size_t index = 0; index < size; ++index)
+	{
+		list.insert(std::pair(index, "string number: " + std::to_string(index)));
+		other_list.insert(std::pair(index, "other string number: " + std::to_string(size - index)));
+	}
+	for (size_t index = 0; index < size; ++index)
+	{
+		EXPECT_TRUE((*list.find(index)).second == "string number: " + std::to_string(index));
+	}
+	list[0] = "abc";
+	EXPECT_TRUE((*list.find(0)).second == "abc");
+	list.erase(list.begin(), list.end());
+	EXPECT_TRUE(list.size() == 0);
+
+	list = std::move(other_list);
+	for (size_t index = 0; index < size; ++index)
+	{
+		EXPECT_TRUE((*list.find(index)).second == "other string number: " + std::to_string(size - index));
+	}
+	skip_list_space::skip_list new_list(std::move(list));
+	for (size_t index = 0; index < size; ++index)
+	{
+		EXPECT_TRUE((*new_list.find(index)).second == "other string number: " + std::to_string(size - index));
+	}
+}
+
+TEST_F(SkipListTest, ContainVector) {
+	auto list = skip_list_space::skip_list<size_t, std::vector<double>>();
+	auto other_list = skip_list_space::skip_list<size_t, std::vector<double>>();
+	const size_t size = 100;
+	for (size_t index = 0; index < size; ++index)
+	{
+		list.insert(std::pair(index, get_random_vector<double>(size, -10.0, 10.0)));
+		other_list.insert(std::pair(index, get_random_vector<double>(size, -10.0, 10.0)));
+	}
+	auto new_value = get_random_vector<double>(size, -10.0, 10.0);
+	other_list[0] = new_value;
+	EXPECT_TRUE((*other_list.find(0)).second == new_value);
+	list.erase(list.begin(), list.end());
+	EXPECT_TRUE(list.size() == 0);
+	list[1] = new_value;
+	list = std::move(other_list);
+	EXPECT_TRUE(list[1] != new_value);
+	EXPECT_TRUE(list[0] == new_value);
+	skip_list_space::skip_list new_list(std::move(list));
+	EXPECT_TRUE(new_list[0] == new_value);
+	static_assert(std::is_convertible_v<std::pair<const int, int>, std::pair<int, int>>);
 }
