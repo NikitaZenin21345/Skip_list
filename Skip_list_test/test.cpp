@@ -19,13 +19,15 @@ protected:
 
 TEST_F(SkipListTest, EmptyList) {
 	auto list = skip_list_space::skip_list<int, int>();
+	auto other_list = skip_list_space::skip_list<int, int>();
 	auto found_element = list.find(0);
 	EXPECT_TRUE(found_element == list.end());
 	EXPECT_TRUE(list.erase(0) == 0);
 	list.erase(list.begin(), list.end());
-	EXPECT_TRUE(list.size() == 0);
+	EXPECT_TRUE(list.empty());
 	list.clear();
-	EXPECT_TRUE(list.size() == 0);
+	EXPECT_TRUE(list.empty());
+	EXPECT_FALSE(list == other_list);
 }
 
 TEST_F(SkipListTest, InsertElements) {
@@ -35,18 +37,33 @@ TEST_F(SkipListTest, InsertElements) {
 	EXPECT_TRUE((*found_element).second == 100);
 	EXPECT_TRUE(list.size() == 1);
 	list.erase(0);
-	EXPECT_TRUE(list.size() == 0);
+	EXPECT_TRUE(list.empty());
 	list[1] = 101;
 	list.erase(list.begin(), list.end());
-	EXPECT_TRUE(list.size() == 0);
+	EXPECT_TRUE(list.empty());
 }
 
 TEST_F(SkipListTest, EraseOnceListElement) {
 	auto list = skip_list_space::skip_list<user_class<int>, int>();
 	list.insert(std::pair<user_class<int>, int>({ 0 }, 100));
+	EXPECT_TRUE(&(list = list) == &list);
 	list.erase(0);
 	auto found_element = list.find(0);
 	EXPECT_TRUE(found_element == list.end());
+	list.erase(0);
+}
+
+TEST_F(SkipListTest, Constructor) {
+	skip_list_space::skip_list<user_class<int>, int> list
+	{
+		std::make_pair<user_class<int>, int>({ 0 }, 100),
+		std::make_pair<user_class<int>, int>({ 1 }, 101),
+		std::make_pair<user_class<int>, int>({ 2 }, 102),
+	};
+	EXPECT_TRUE(&(list = list) == &list);
+	auto copy_list(list);
+	auto move_list(std::move(list));
+	EXPECT_TRUE(copy_list == move_list);
 }
 
 TEST_F(SkipListTest, FindElement) {
@@ -149,6 +166,8 @@ TEST_F(SkipListTest, Erase) {
 	EXPECT_TRUE(list.find(erased_elem.first) == list.end());
 	EXPECT_FALSE(iter == ++list.begin());
 	EXPECT_TRUE(list.size() == size - 1);
+	list.erase(list.begin(), list.end());
+	EXPECT_TRUE(list.empty());
 }
 
 TEST_F(SkipListTest, EraseRange) {
@@ -220,6 +239,8 @@ TEST_F(SkipListTest, OperatorEqual) {
 	}
 	auto other_list = list;
 	EXPECT_TRUE(other_list == list);
+	list[rand_vec[4]] = user_class(5);
+	EXPECT_TRUE(other_list != list);
 }
 
 TEST_F(SkipListTest, OperatorBraket) {
@@ -269,7 +290,7 @@ TEST_F(SkipListTest, Clear) {
 		list.insert(std::pair(rand_vec[index], user_class(index)));
 	}
 	list.clear();
-	EXPECT_TRUE(list.size() == 0);
+	EXPECT_TRUE(list.empty());
 	for (size_t index = 0; index < size; ++index)
 	{
 		EXPECT_TRUE(list.find(rand_vec[index]) == list.end());
@@ -292,7 +313,7 @@ TEST_F(SkipListTest, ContainString) {
 	list[0] = "abc";
 	EXPECT_TRUE((*list.find(0)).second == "abc");
 	list.erase(list.begin(), list.end());
-	EXPECT_TRUE(list.size() == 0);
+	EXPECT_TRUE(list.empty());
 
 	list = std::move(other_list);
 	for (size_t index = 0; index < size; ++index)
@@ -319,7 +340,7 @@ TEST_F(SkipListTest, ContainVector) {
 	other_list[0] = new_value;
 	EXPECT_TRUE((*other_list.find(0)).second == new_value);
 	list.erase(list.begin(), list.end());
-	EXPECT_TRUE(list.size() == 0);
+	EXPECT_TRUE(list.empty());
 	list[1] = new_value;
 	list = std::move(other_list);
 	EXPECT_TRUE(list[1] != new_value);
@@ -327,4 +348,27 @@ TEST_F(SkipListTest, ContainVector) {
 	skip_list_space::skip_list new_list(std::move(list));
 	EXPECT_TRUE(new_list[0] == new_value);
 	static_assert(std::is_convertible_v<std::pair<const int, int>, std::pair<int, int>>);
+}
+
+TEST_F(SkipListTest, SkipListSkipLists) {
+	using skip_list = skip_list_space::skip_list<size_t, std::vector<size_t>>;
+	skip_list_space::skip_list <size_t, skip_list_space::skip_list < size_t, std::vector<size_t>>> list
+	{
+	  std::make_pair(1, skip_list()),
+	  std::make_pair(2, skip_list()),
+	  std::make_pair(3, skip_list())
+	};
+	const size_t size = 3;
+	for (size_t index = 0; index < size - 1; ++index)
+	{
+		list[index].insert(std::pair(index, std::vector<size_t>{ index, index, index}));
+	}
+	for (size_t index = 0; index < size - 1; ++index)
+	{
+		auto cmp_vector = std::vector<size_t>{ index, index, index };
+		auto lIst_element = (*list.find(index)).second;
+		EXPECT_TRUE((*lIst_element.find(index)).second == cmp_vector);
+	}
+	list.erase(list.find(1));
+	EXPECT_TRUE(list.find(1) == list.end());
 }

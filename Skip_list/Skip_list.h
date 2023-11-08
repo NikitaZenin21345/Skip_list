@@ -349,6 +349,14 @@ namespace skip_list_space
 			node<Key, Value>::bind_node(head, tail, Max_Level);
 		}
 
+		explicit skip_list(const std::initializer_list<value_type>& list,const Compare& comp = Compare(), const Alloc& alloc = Alloc()) : skip_list(comp, alloc)
+		{
+			for(const auto& inserted_value : list)
+			{
+				insert(inserted_value);
+			}
+		}
+
 		~skip_list()
 		{
 			delete_list();
@@ -368,8 +376,9 @@ namespace skip_list_space
 			}
 		}
 
-		skip_list(skip_list&& another) noexcept : compare(std::move(another.compare)), allocator(std::move(another.allocator)),
-			list_size(another.list_size), list_lvl(another.list_lvl)
+		skip_list(skip_list&& another) noexcept : compare(std::move_if_noexcept(another.compare)),
+			allocator(std::move_if_noexcept(another.allocator)),
+				list_size(another.list_size), list_lvl(another.list_lvl)
 		{
 			head = another.head;
 			tail = another.tail;
@@ -392,9 +401,11 @@ namespace skip_list_space
 			list_lvl = another.list_lvl;
 			head = new node<Key, Value>;
 			tail = new node<Key, Value>;
-			for (auto list_node : another)
+			node<Key, Value>::bind_node(head, tail, Max_Level);
+			for (auto list_element = another.cbegin(); list_element != another.cend(); ++list_element)
 			{
-				insert(std::make_pair((*list_node).get_key(), (*list_node).get_value()));
+				auto [inserted_key, inserted_value] = *list_element;
+				insert(std::make_pair(inserted_key, inserted_value));
 			}
 			return *this;
 		}
@@ -405,14 +416,12 @@ namespace skip_list_space
 			{
 				return *this;
 			}
-			compare = std::move(another.compare);
-			allocator = std::move(another.allocator);
+			compare = std::move_if_noexcept(another.compare);
+			allocator = std::move_if_noexcept(another.allocator);
 			list_size = another.list_size;
 			list_lvl = another.list_lvl;
 			std::swap(head, another.head);
 			std::swap(tail, another.tail);
-			another.list_lvl = 0;
-			another.list_size = 0;
 			return *this;
 		}
 
@@ -462,7 +471,7 @@ namespace skip_list_space
 		std::pair<iterator, bool> insert(Pair&& value_nods)
 		{
 			auto [key, value] = value_nods;
-			size_t level = random_level(Max_Level);
+			size_t level = random_tools::random_level(Max_Level);
 			node<Key, Value, Alloc>* new_node = nullptr;
 			if (list_size)
 			{
@@ -596,7 +605,7 @@ namespace skip_list_space
 
 		bool operator==(const skip_list& another) const
 		{
-			if (another.size() != list_size)
+			if (another.size() != list_size || empty() || another.empty())
 			{
 				return false;
 			}

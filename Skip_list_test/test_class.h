@@ -72,13 +72,23 @@ public:
 		return value;
 	}
 };
+
 template<typename type>
 std::vector<type> get_random_vector(size_t size,const type low_bound,const type up_bound)
 {
 	std::vector<type> vec;
 	for(size_t index = 0 ;index!=size; index++)
 	{
-		vec.push_back(impl::get_random_number<type>(low_bound, up_bound));
+		vec.push_back(random_tools::impl::get_random_number<type>(low_bound, up_bound));
 	}
 	return vec;
 }
+
+template<typename Value>
+class user_cmp
+{
+	bool operator()(const Value& value_first, const Value& value_second) const
+	{
+		return value_second < value_first;
+	}
+};
