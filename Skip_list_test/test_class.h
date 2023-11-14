@@ -6,6 +6,7 @@ class user_class
 {
 	value_type value{};
 	value_type* ptr = nullptr;
+	inline static size_t move_counter = 0;
 public:
 	user_class() = default;
 	user_class(value_type value_) :value(value_)
@@ -28,6 +29,7 @@ public:
 		value = std::move(other.value);
 		ptr = other.ptr;
 		other.ptr = nullptr;
+		move_counter += 1;
 	}
 
 	user_class& operator=(user_class&& other) noexcept
@@ -38,6 +40,7 @@ public:
 		}
 		value = std::move(other.value);
 		std::swap(ptr, other.ptr);
+		move_counter += 1;
 		return *this;
 	}
 
@@ -71,6 +74,11 @@ public:
 	{
 		return value;
 	}
+
+	static size_t get_move_counter()
+	{
+		return move_counter;
+	}
 };
 
 template<typename type>
@@ -87,7 +95,8 @@ std::vector<type> get_random_vector(size_t size,const type low_bound,const type 
 template<typename Value>
 class user_cmp
 {
-	bool operator()(const Value& value_first, const Value& value_second) const
+public:
+	bool operator()(const Value& value_first,const Value& value_second) const
 	{
 		return value_second < value_first;
 	}

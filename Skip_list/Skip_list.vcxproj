@@ -131,9 +131,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Skip_list.cpp" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="random_number.h" />
     <ClInclude Include="Skip_list.h" />
     <ClInclude Include="skip_list_exception.h" />

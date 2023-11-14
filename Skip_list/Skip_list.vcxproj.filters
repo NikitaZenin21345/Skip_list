@@ -17,9 +17,4 @@
       <Filter>Skip_list</Filter>
     </ClInclude>
   </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Skip_list.cpp">
-      <Filter>Skip_list</Filter>
-    </ClCompile>
-  </ItemGroup>
 </Project>
