@@ -6,7 +6,7 @@ class user_class
 {
 	value_type value{};
 	value_type* ptr = nullptr;
-	inline static size_t move_counter = 0;
+	inline static size_t copy_counter = 0;
 public:
 	user_class() = default;
 	user_class(value_type value_) :value(value_)
@@ -22,14 +22,15 @@ public:
 			ptr = new value_type[10];
 			memcpy(ptr, other.ptr, 10 * sizeof(value_type));
 		}
+		copy_counter += 1;
 	}
 
 	user_class(user_class&& other) noexcept
 	{
-		value = std::move(other.value);
+		value = std::move_if_noexcept(other.value);
 		ptr = other.ptr;
 		other.ptr = nullptr;
-		move_counter += 1;
+		copy_counter += 1;
 	}
 
 	user_class& operator=(user_class&& other) noexcept
@@ -38,9 +39,9 @@ public:
 		{
 			return *this;
 		}
-		value = std::move(other.value);
+		value = std::move_if_noexcept(other.value);
 		std::swap(ptr, other.ptr);
-		move_counter += 1;
+		copy_counter += 1;
 		return *this;
 	}
 
@@ -54,6 +55,7 @@ public:
 		ptr = new value_type[10];
 		value = other.value;
 		memcpy(ptr, other.ptr, 10 * sizeof(value_type));
+		copy_counter++;
 		return *this;
 	}
 
@@ -75,9 +77,9 @@ public:
 		return value;
 	}
 
-	static size_t get_move_counter()
+	static size_t get_copy_counter()
 	{
-		return move_counter;
+		return copy_counter;
 	}
 };
 
@@ -100,4 +102,23 @@ public:
 	{
 		return value_second < value_first;
 	}
+};
+
+template<typename Value>
+class bad_cmp final
+{
+public:
+	bad_cmp(const bad_cmp& other) = delete;
+	int operator()(const Value& value_first, const Value& value_second) const
+	{
+		return value_second - value_first;
+	}
+};
+
+template<typename Value>
+class bad_value final
+{
+	int a{};
+public:
+	bad_value(const bad_value& other) = delete;
 };

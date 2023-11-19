@@ -5,6 +5,12 @@
     <ClCompile Include="test.cpp">
       <Filter>Test_Skip_list</Filter>
     </ClCompile>
+    <ClCompile Include="test_level.cpp">
+      <Filter>Test_Skip_list</Filter>
+    </ClCompile>
+    <ClCompile Include="test_node.cpp">
+      <Filter>Test_Skip_list</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
