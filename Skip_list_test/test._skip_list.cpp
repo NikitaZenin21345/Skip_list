@@ -1,7 +1,7 @@
 #include "pch.h"
 #include <crtdbg.h> 
 #include "Skip_list.h"
-#include "test_class.h"
+#include "user_class.h"
 
 class SkipListTest : public ::testing::Test {
 protected:
@@ -29,7 +29,7 @@ TEST_F(SkipListTest, EmptyList) {
 	EXPECT_FALSE(list == other_list);
 }
 
-TEST_F(SkipListTest, InsertElements) {
+TEST_F(SkipListTest, InsertOneElements) {
 	auto list = skip_list_space::skip_list<size_t, size_t>();
 	auto pair_first = list.insert(std::pair(0, 100));
 	EXPECT_TRUE(pair_first.second);
@@ -74,7 +74,7 @@ TEST_F(SkipListTest, UserCmp) {
 	static_assert(skip_list_space::is_compare<user_cmp<size_t>, size_t>);
 	using list_type = skip_list_space::skip_list<size_t, size_t, user_cmp<size_t>>;
 	auto list = list_type();
-	const size_t size = 100;
+	constexpr size_t size = 100;
 	for (size_t index = 0; index < size; ++index)
 	{
 		list.insert(std::pair(index, index));
@@ -93,18 +93,18 @@ TEST_F(SkipListTest, FindElement) {
 
 	for (size_t index = 0; index < size; ++index)
 	{
-		list.insert(std::pair(rand_vec[index], index));
+		list.insert(std::pair<const user_class<double>, size_t>({rand_vec[index]}, index));
 	}
 	auto found_element = list.find(user_class(rand_vec[4]));
 	EXPECT_TRUE((*found_element).second == 4);
 	const auto const_list = list;
 	auto const_found_element = const_list.find(user_class(rand_vec[7]));
-	/*(*const_found_element).second = 5;*/
+	//(*const_found_element).second = 5;//const
 }
 
 TEST_F(SkipListTest, Loop) {
 	auto list = skip_list_space::skip_list<size_t, size_t, std::greater<>>(std::greater<>());
-	const size_t size = 200;
+	constexpr size_t size = 200;
 	for (size_t i = 1; i <= size; ++i)
 	{
 		list.insert(std::pair(i, size - i));
@@ -117,10 +117,10 @@ TEST_F(SkipListTest, Loop) {
 	}
 }
 
-TEST_F(SkipListTest, ReverseLoop)
+TEST_F(SkipListTest, ReverseIterator)
 {
 	auto list = skip_list_space::skip_list<double, size_t>();
-	const size_t size = 10;
+	constexpr size_t size = 10;
 	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
 	for (size_t index = 0; index < size; ++index)
 	{
@@ -140,12 +140,35 @@ TEST_F(SkipListTest, ReverseLoop)
 	{
 		EXPECT_DOUBLE_EQ((*list_iterator).first, rand_vec[index]);
 		--index;
-		//(*list_iterator).second = 0;
+		//(*list_iterator).second = 0;//const
 	}
-	auto list_iterator = list.rbegin();
 }
 
-TEST_F(SkipListTest, Iterator)
+TEST_F(SkipListTest, EmptyListIterator)
+{
+	using list_type = skip_list_space::skip_list<size_t, size_t>;
+	auto list = list_type();
+
+	auto list_iterator = list.begin();
+	EXPECT_THROW(*list_iterator, error_dereferencing_end);
+	EXPECT_THROW(++list_iterator, std::out_of_range);
+	EXPECT_THROW(--list_iterator, std::out_of_range);
+}
+
+TEST_F(SkipListTest, OneElementIterator)
+{
+	using list_type = skip_list_space::skip_list<size_t, size_t>;
+	auto list = list_type();
+	size_t value = 1;
+	list[value] = value;
+
+	auto list_iterator = list.begin();
+	EXPECT_TRUE(list_iterator.get_node_value()->get_value() == value);
+	EXPECT_TRUE(++list_iterator == list.end());
+	EXPECT_THROW(*list_iterator, error_dereferencing_end);
+}
+
+TEST_F(SkipListTest, OperationIterator)
 {
 	using list_type = skip_list_space::skip_list<size_t, size_t>;
 	auto list = list_type();
@@ -159,12 +182,11 @@ TEST_F(SkipListTest, Iterator)
 	auto list_iterator = list.begin();
 	auto prev_next = --(++list_iterator);
 	EXPECT_TRUE(list_iterator == prev_next);
-
 	for (auto& [key, value] : list)
 	{
 		value = 0;
 	}
-	for (auto& [key, value] : list)
+	for (const auto& [key, value] : list)
 	{
 		EXPECT_TRUE(value == 0);
 	}
@@ -173,19 +195,29 @@ TEST_F(SkipListTest, Iterator)
 	{
 		EXPECT_TRUE((*list_iterator_).second == index);
 		++index;
-		//(*list_iterator).second = 0;
 	}
-	list_iterator = list.end();
+}
+
+TEST_F(SkipListTest, OutOfRangeIterator)
+{
+	using list_type = skip_list_space::skip_list<user_class<size_t>, size_t>;
+	auto list = list_type();
+	size_t size = 200;
+	for (size_t i = 0; i < size; ++i)
+	{
+		list.insert(std::pair<user_class<size_t>, size_t>(i, i));
+	}
+	auto list_iterator = list.end();
 	EXPECT_THROW(++list_iterator, std::out_of_range);
 	EXPECT_THROW(*list_iterator, error_dereferencing_end);
-	list_type::iterator iterator_first = list_iterator;
-	list_type::const_iterator const_iterator = iterator_first;
-	//list_type::iterator iterator_third = const_iterator;
+	list_type::iterator iterator_ = list_iterator;
+	list_type::const_iterator const_iterator = iterator_;
+	//list_type::iterator other_iterator_ = const_iterator;// const
 }
 
 TEST_F(SkipListTest, Erase) {
 	auto list = skip_list_space::skip_list<double, size_t, std::greater<>>(std::greater<>());
-	const size_t size = 100;
+	constexpr size_t size = 100;
 	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
 	for (size_t index = 0; index < size; ++index)
 	{
@@ -205,7 +237,7 @@ TEST_F(SkipListTest, Erase) {
 
 TEST_F(SkipListTest, EraseRange) {
 	auto list = skip_list_space::skip_list<double, size_t, std::greater<>>(std::greater<>());
-	const size_t size = 100;
+	constexpr size_t size = 100;
 	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
 	for (size_t index = 0; index < size; ++index)
 	{
@@ -228,7 +260,7 @@ TEST_F(SkipListTest, EraseRange) {
 
 TEST_F(SkipListTest, EraseKey) {
 	auto list = skip_list_space::skip_list<double, user_class<size_t>, std::greater<>>(std::greater<>());
-	const size_t size = 100;
+	constexpr size_t size = 100;
 	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
 	for (size_t index = 0; index < size; ++index)
 	{
@@ -247,7 +279,7 @@ TEST_F(SkipListTest, EraseKey) {
 TEST_F(SkipListTest, Swap) {
 	auto list = skip_list_space::skip_list<double, user_class<size_t>, std::greater<>>(std::greater<>());
 	auto other_list = skip_list_space::skip_list<double, user_class<size_t>, std::greater<>>(std::greater<>());
-	const size_t size = 100;
+	constexpr size_t size = 100;
 	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
 	for (size_t index = 0; index < size; ++index)
 	{
@@ -262,16 +294,21 @@ TEST_F(SkipListTest, Swap) {
 	}
 }
 
-TEST_F(SkipListTest, Concept)
+TEST_F(SkipListTest, ListRequires)
 {
+	static_assert(skip_list_space::is_compare<user_cmp<int>, int>);
+	static_assert(skip_list_space::valid_Value<user_class<int>>);
+	static_assert(skip_list_space::valid_Key<user_class<int>>);
+	static_assert(skip_list_space::comparable_value<user_class<int>>);
 	static_assert(!skip_list_space::is_compare<bad_cmp<int>, int>);
 	static_assert(!skip_list_space::valid_Value<bad_value<int>>);
 	static_assert(!skip_list_space::valid_Key<bad_value<int>>);
+	static_assert(!skip_list_space::comparable_value<bad_value<int>>);
 }
 
 TEST_F(SkipListTest, OperatorEqual) {
 	auto list = skip_list_space::skip_list<double, user_class<size_t>, std::greater<>>(std::greater<>());
-	const size_t size = 100;
+	constexpr size_t size = 100;
 	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
 	for (size_t index = 0; index < size; ++index)
 	{
@@ -292,20 +329,20 @@ TEST_F(SkipListTest, OperatorBraket) {
 		list.insert(std::pair(index, user_class(index)));
 	}
 
-	auto new_value = user_class(50);
-	auto key = 50;
+	const auto new_value = user_class(50);
+	const auto key = 50;
 	list[key] = new_value;
 	EXPECT_TRUE((*list.find(key)).second == new_value);
 	list.erase(key);
-	auto found_element = list.find(key);
+	const auto found_element = list.find(key);
 	EXPECT_TRUE(found_element == list.end());
 	list[key] = new_value;
 	EXPECT_TRUE((*list.find(key)).second == new_value);
 }
 
 TEST_F(SkipListTest, At) {
-	auto list = skip_list_space::skip_list<size_t, double, std::greater<>>(std::greater<>());
-	const size_t size = 100;
+	auto list = skip_list_space::skip_list<size_t, double, std::greater<>, 11>(std::greater<>());
+	constexpr size_t size = 100;
 	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
 	for (size_t index = 0; index < size; ++index)
 	{
@@ -313,8 +350,8 @@ TEST_F(SkipListTest, At) {
 	}
 	[[maybe_unused]] const auto const_list = list;
 
-	double new_value = 20.0;
-	auto key = 50;
+	constexpr double new_value = 20.0;
+	constexpr auto key = 50;
 	list.at(key) = new_value;
 	EXPECT_DOUBLE_EQ((*list.find(key)).second, new_value);
 	static_assert(std::is_same_v<decltype(const_list.at(key)), const double&>);
@@ -322,8 +359,8 @@ TEST_F(SkipListTest, At) {
 }
 
 TEST_F(SkipListTest, Clear) {
-	auto list = skip_list_space::skip_list<double, user_class<size_t>, std::greater<>>(std::greater<>());
-	const size_t size = 100;
+	auto list = skip_list_space::skip_list<double, user_class<size_t>, std::greater<>, 2>(std::greater<>());
+	constexpr size_t size = 100;
 	auto rand_vec = get_random_vector<double>(size, -10.0, 10.0);
 	for (size_t index = 0; index < size; ++index)
 	{
@@ -340,7 +377,7 @@ TEST_F(SkipListTest, Clear) {
 TEST_F(SkipListTest, ContainString) {
 	auto list = skip_list_space::skip_list<size_t, std::string>();
 	auto other_list = skip_list_space::skip_list<size_t, std::string>();
-	const size_t size = 100;
+	constexpr size_t size = 100;
 	for (size_t index = 0; index < size; ++index)
 	{
 		list.insert(std::pair(index, "string number: " + std::to_string(index)));
@@ -370,7 +407,7 @@ TEST_F(SkipListTest, ContainString) {
 TEST_F(SkipListTest, ContainVector) {
 	auto list = skip_list_space::skip_list<size_t, std::vector<double>>();
 	auto other_list = skip_list_space::skip_list<size_t, std::vector<double>>();
-	const size_t size = 100;
+	constexpr size_t size = 100;
 	for (size_t index = 0; index < size; ++index)
 	{
 		list.insert(std::pair(index, get_random_vector<double>(size, -10.0, 10.0)));
@@ -398,7 +435,7 @@ TEST_F(SkipListTest, SkipListSkipLists) {
 	  std::make_pair(2, skip_list()),
 	  std::make_pair(3, skip_list())
 	};
-	const size_t size = 3;
+	constexpr size_t size = 3;
 	for (size_t index = 0; index < size - 1; ++index)
 	{
 		list[index].insert(std::pair(index, std::vector{ index, index, index }));
@@ -416,18 +453,41 @@ TEST_F(SkipListTest, SkipListSkipLists) {
 TEST_F(SkipListTest, ComparisonListsAnyMaxLevel) {
 	skip_list_space::skip_list<user_class<int>, size_t, std::less<>, 20> list1
 	{
-	  std::make_pair(user_class<int>(1), 101),
-	  std::make_pair(user_class<int>(2), 102),
-	  std::make_pair(user_class<int>(3), 103)
+	  std::make_pair(user_class(1), 101),
+	  std::make_pair(user_class(2), 102),
+	  std::make_pair(user_class(3), 103)
 	};
 	skip_list_space::skip_list<user_class<int>, size_t, std::less<>, 21> list2
 	{
-		std::make_pair(user_class<int>(1), 101),
-		std::make_pair(user_class<int>(2), 102),
-		std::make_pair(user_class<int>(3), 103)
+		std::make_pair(user_class(1), 101),
+		std::make_pair(user_class(2), 102),
+		std::make_pair(user_class(3), 103)
 	};
 	EXPECT_TRUE(list1 == list2);
-	list2[user_class<int>(2)] = 104;
+	list2[user_class(2)] = 104;
 	EXPECT_TRUE(list1 != list2);
+	list1.erase(user_class(2));
+	list2.erase(user_class(2));
+	EXPECT_TRUE(list1 == list2);
 }
 
+TEST_F(SkipListTest, ListSeed) {
+	constexpr unsigned int new_seed = 9438U;
+	skip_list_space::skip_list<user_class<size_t>, size_t, std::less<>,
+		20, std::allocator<std::pair<const user_class<size_t>, size_t>>, new_seed> list1;
+	skip_list_space::skip_list<size_t, size_t, std::less<>, 20,
+		std::allocator<std::pair<const size_t, size_t>>, new_seed> list2;
+	const size_t size = 200;
+	for (size_t i = 0; i < size; ++i)
+	{
+		list1.insert(std::pair<user_class<size_t>, size_t>(i, i));
+		list2.insert(std::pair(i, i));
+	}
+
+	auto iter_list1 = list1.begin();
+	auto iter_list2 = list2.begin();
+	for (size_t i = 0; i < list1.size(); ++i)
+	{
+		EXPECT_TRUE((++iter_list1).get_node_value()->get_level() == (++iter_list2).get_node_value()->get_level());
+	}
+}

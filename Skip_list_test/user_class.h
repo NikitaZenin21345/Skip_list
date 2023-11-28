@@ -87,9 +87,11 @@ template<typename type>
 std::vector<type> get_random_vector(size_t size,const type low_bound,const type up_bound)
 {
 	std::vector<type> vec;
+	std::random_device rd;
+	std::mt19937 gen(rd());
 	for(size_t index = 0 ;index!=size; index++)
 	{
-		vec.push_back(random_tools::impl::get_random_number<type>(low_bound, up_bound));
+		vec.push_back(random_tools::impl::get_random_number<type>(low_bound, up_bound, gen));
 	}
 	return vec;
 }
@@ -121,4 +123,5 @@ class bad_value final
 	int a{};
 public:
 	bad_value(const bad_value& other) = delete;
+	bool operator==(const bad_value&) const= delete;
 };

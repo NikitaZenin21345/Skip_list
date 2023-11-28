@@ -2,7 +2,7 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="pch.cpp" />
-    <ClCompile Include="test.cpp">
+    <ClCompile Include="test._skip_list.cpp">
       <Filter>Test_Skip_list</Filter>
     </ClCompile>
     <ClCompile Include="test_level.cpp">
@@ -14,10 +14,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
-    <ClInclude Include="skip_list_condition.h">
-      <Filter>Test_Skip_list</Filter>
-    </ClInclude>
-    <ClInclude Include="test_class.h">
+    <ClInclude Include="user_class.h">
       <Filter>Test_Skip_list</Filter>
     </ClInclude>
   </ItemGroup>

@@ -41,7 +41,6 @@ TEST(LevelTest, CompareOperation)
 	size_t start_value = 16;
 	size_t second_start_value = 48;
 	skip_list_space::Level<64> level_first(start_value);
-	skip_list_space::Level<64> level_second(second_start_value);
 	EXPECT_TRUE(level_first == start_value);
 	EXPECT_TRUE(level_first <= start_value);
 	EXPECT_TRUE(level_first > skip_list_space::Level<64>(15));
